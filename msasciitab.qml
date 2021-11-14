@@ -24,7 +24,7 @@ MuseScore {
     // ASCII tab content
     property var textContent: ""
 
-    // Maximum width of a single line of tab in characters
+    // Maximum width of a single line of tab in characters (excludes legends/barlines)
     property var maxLineWidth: 112
 
     FileIO {
@@ -102,12 +102,9 @@ MuseScore {
 
         // Current bar number
         var barNum = 0;
-        
-        // Add string legend
-        legendTabBuf(tabBuf, 0)
 
-        // Add extra barline
-        barlineTabBuf(tabBuf, 1);
+        // Score index where line should be wrapped next 
+        var lineLengthLimit = 0;
        
         while (cursor.segment) { 
             // Each quarter note consists of 480 ticks
@@ -116,22 +113,42 @@ MuseScore {
             var nextIdx = cursor.segment.next.tick/40; 
             var barWidth = cursor.measure.timesigNominal.ticks/40;  
 
-            console.log("________________________________________");
-            var timeSig = cursor.measure.timesigNominal;
-            console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
-            console.log("Indices " + curIdx + " - " + nextIdx);
-
             // Check if a new bar has been reached
-            if (curIdx >= barIdxTotal) {
-                barIdxTotal += barWidth;
+            if (curIdx >= barIdxTotal) {               
                 console.log("New bar! (#" + barNum++ + ")");
+
+                barIdxTotal += barWidth;
+
+                if (barIdxTotal >= lineLengthLimit) {
+                    if (barNum > 1) {
+                        // Add final barline before break
+                        barlineTabBuf(tabBuf, writeOffset + barIdxTotal);
+
+                        // Flush tab buffer
+                        flushTabBuf(tabBuf);
+                    }
+
+                    // Add new string legend
+                    legendTabBuf(tabBuf, 0)
+
+                    lineLengthLimit += maxLineWidth;
+                }
 
                 // Add new barline and extra padding
                 barlineTabBuf(tabBuf, writeOffset + curIdx);
                 extendTabBuf(tabBuf, writeOffset + curIdx + 1, writeOffset + curIdx + 4);
-                writeOffset += 4;
+                writeOffset += 4;      
             }
 
+            // Debug stuff
+            console.log("________________________________________");
+            console.log("Bar " + barNum);
+            var timeSig = cursor.measure.timesigNominal;
+            console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
+            console.log("Indices " + curIdx + " - " + nextIdx);
+            console.log("barIdxTotal: " + barIdxTotal + ", lineLengthLimit: " + lineLengthLimit);
+
+            // Write notes/rests
             if (cursor.element && cursor.element.type == Element.CHORD) {             
                 // Get chord
                 var curChord = cursor.element;
@@ -154,15 +171,12 @@ MuseScore {
             } 
             
             cursor.next();    
-
-            // End of bar
-            //barlineTabBuf(tabBuf, idx);
         }
 
-        // Barline to end
+        // Final barline
         barlineTabBuf(tabBuf, writeOffset + barIdxTotal);
 
-        // Render tab to textContent
+        // Render final part of tab to textContent
         flushTabBuf(tabBuf);
 
         return textContent;
@@ -184,8 +198,6 @@ MuseScore {
         for (var line=0; line<6; line++)
             for (var idx=startIdx; idx<endIdx; idx++)
                 tabBuf[line][idx] = "-";
-
-        //writeOffset += endIdx - startIdx;
     }
 
     function barlineTabBuf(tabBuf, idx) {
@@ -211,9 +223,15 @@ MuseScore {
 
         for (var line=0; line<6; line++) { 
             textContent += tabBuf[line].join("");
-            textContent += "\n";             
+            textContent += "\r\n";             
         }  
-        textContent += "\n"; 
+        textContent += "\r\n"; 
+
+        // Clear tab buffer
+        for (var line=0; line<6; line++)
+            tabBuf[line].length = 0;
+
+        //tabBuf = [[], [], [], [], [], []];
 
         //writeOffset = -barIdxTotal; 
     }
