@@ -24,11 +24,11 @@ MuseScore {
     }
 
     FileDialog {
-		id: directorySelectDialog
-		title: qsTr("Export ASCII tab...")
-		selectFolder: true
-		visible: false
-		onAccepted: {
+        id: directorySelectDialog
+        title: qsTr("Export ASCII tab...")
+        selectFolder: true
+        visible: false
+        onAccepted: {
             var fname = this.folder.toString().replace("file://", "").replace(/^\/(.:\/)(.*)$/, "$1$2");
             writeTab(fname);
         }
@@ -36,22 +36,22 @@ MuseScore {
             console.log("Cancelled");
             Qt.quit();
         }
-		Component.onCompleted: visible = false
-	}
+        Component.onCompleted: visible = false
+    }
 
     MessageDialog {
-		id: errorDialog
-		visible: false
-		title: "Error"
-		text: "Error"
-		onAccepted: {
-			Qt.quit();
-		}
-		function openErrorDialog(message) {
-			text = message;
-			open();
-		}
-	}
+        id: errorDialog
+        visible: false
+        title: "Error"
+        text: "Error"
+        onAccepted: {
+            Qt.quit();
+        }
+        function openErrorDialog(message) {
+            text = message;
+            open();
+        }
+    }
 
     onRun: {
         if (typeof curScore === 'undefined') {   
@@ -103,6 +103,10 @@ MuseScore {
         
         // Add string legend
         legendTabBuf(tabBuf, 0)
+        offset += 1;
+
+        // Add extra barline
+        barlineTabBuf(tabBuf, 1);
         offset += 1;
 
         while (cursor.segment) { 
