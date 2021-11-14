@@ -3,7 +3,6 @@ import QtQuick.Controls 1.1
 import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.2
 import Qt.labs.settings 1.0
-// FileDialog
 import Qt.labs.folderlistmodel 2.1
 import QtQml 2.2
 
@@ -16,11 +15,21 @@ MuseScore {
     version: "0.0.1"
     requiresScore: true
 
-    property var helloWorld: "Hello World!"
+    // Total number of extra characters' width added by barlines etc.
+    property var writeOffset: 0
+
+    // Represents the next upcoming barline boundary
+    property var barIdxTotal: 0
+
+    // ASCII tab content
+    property var textContent: ""
+
+    // Maximum width of a single line of tab in characters
+    property var maxLineWidth: 112
 
     FileIO {
         id: asciiTabWriter
-        onError: console.log(msg + "\nFilename = " + asciiTabWriter.source)
+        onError: console.log(msg + "\nFilename = " + asciiTabWriter.source);
     }
 
     FileDialog {
@@ -67,7 +76,7 @@ MuseScore {
 
     function writeTab(fname) {
         // Generate ASCII tab
-        var textContent = processTab();
+        processTab();
         var name = curScore.metaTag("workTitle");
         console.log("Name: " + name);
 
@@ -84,7 +93,6 @@ MuseScore {
     function processTab() {
         // Initialise tab line buffer and text output
         var tabBuf = [[], [], [], [], [], []]; 
-        var textContent = "";
 
         // Create and reset cursor
         var cursor = curScore.newCursor();
@@ -92,23 +100,15 @@ MuseScore {
         cursor.staffIdx = 0;       
         cursor.rewind(0);
 
-        // Total number of extra characters' width added by barlines etc.
-        var offset = 0;
-
-        // Represents the next upcoming barline boundary
-        var barIdxTotal = 0;
-
         // Current bar number
         var barNum = 0;
         
         // Add string legend
         legendTabBuf(tabBuf, 0)
-        offset += 1;
 
         // Add extra barline
         barlineTabBuf(tabBuf, 1);
-        offset += 1;
-
+       
         while (cursor.segment) { 
             // Each quarter note consists of 480 ticks
             // This corresponds to a width of 12 characters in the generated ASCII tab
@@ -116,7 +116,7 @@ MuseScore {
             var nextIdx = cursor.segment.next.tick/40; 
             var barWidth = cursor.measure.timesigNominal.ticks/40;  
 
-            console.log("*************************");
+            console.log("________________________________________");
             var timeSig = cursor.measure.timesigNominal;
             console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
             console.log("Indices " + curIdx + " - " + nextIdx);
@@ -126,10 +126,10 @@ MuseScore {
                 barIdxTotal += barWidth;
                 console.log("New bar! (#" + barNum++ + ")");
 
-                // Add new barline and padding
-                barlineTabBuf(tabBuf, offset + curIdx);
-                extendTabBuf(tabBuf, offset + curIdx + 1, offset + curIdx + 4);
-                offset += 4;
+                // Add new barline and extra padding
+                barlineTabBuf(tabBuf, writeOffset + curIdx);
+                extendTabBuf(tabBuf, writeOffset + curIdx + 1, writeOffset + curIdx + 4);
+                writeOffset += 4;
             }
 
             if (cursor.element && cursor.element.type == Element.CHORD) {             
@@ -144,13 +144,13 @@ MuseScore {
                     stringBuf[stringNum] = fretNum;
                 }
 
-                extendTabBuf(tabBuf, offset + curIdx, offset + nextIdx);
+                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
 
                 // Write notes for current segment
-                addNotesToTabBuf(tabBuf, stringBuf, offset + curIdx);        
+                addNotesToTabBuf(tabBuf, stringBuf, writeOffset + curIdx);        
             }
             else if (cursor.element && cursor.element.type == Element.REST) {
-                extendTabBuf(tabBuf, offset + curIdx, offset + nextIdx);       
+                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);       
             } 
             
             cursor.next();    
@@ -159,8 +159,11 @@ MuseScore {
             //barlineTabBuf(tabBuf, idx);
         }
 
+        // Barline to end
+        barlineTabBuf(tabBuf, writeOffset + barIdxTotal);
+
         // Render tab to textContent
-        textContent = flushTabBuf(textContent, tabBuf);
+        flushTabBuf(tabBuf);
 
         return textContent;
     }
@@ -181,23 +184,15 @@ MuseScore {
         for (var line=0; line<6; line++)
             for (var idx=startIdx; idx<endIdx; idx++)
                 tabBuf[line][idx] = "-";
+
+        //writeOffset += endIdx - startIdx;
     }
 
     function barlineTabBuf(tabBuf, idx) {
         for (var line=0; line<6; line++)
             tabBuf[line][idx] = "|";
-    }
-
-    function flushTabBuf(textContent, tabBuf) {
-        var tabBufLen = tabBuf[0].length;
-
-        for (var line=0; line<6; line++) { 
-            textContent += tabBuf[line].join("");
-            textContent += "\n";             
-        }  
-        textContent += "\n"; 
-
-        return textContent;  
+        
+        writeOffset++;
     }
 
     function legendTabBuf(tabBuf, idx) {
@@ -207,5 +202,19 @@ MuseScore {
         tabBuf[3][idx] = "D";
         tabBuf[4][idx] = "A";
         tabBuf[5][idx] = "E";
+
+        writeOffset++;
+    }
+
+    function flushTabBuf(tabBuf) {
+        var tabBufLen = tabBuf[0].length;
+
+        for (var line=0; line<6; line++) { 
+            textContent += tabBuf[line].join("");
+            textContent += "\n";             
+        }  
+        textContent += "\n"; 
+
+        //writeOffset = -barIdxTotal; 
     }
 }
