@@ -86,34 +86,47 @@ MuseScore {
         var tabBuf = [[], [], [], [], [], []]; 
         var textContent = "";
 
-        // Not used currently
-        var startStaff = 0;
-        var endStaff = curScore.nstaves;
-        var startTick = 0;
-        var endTick = curScore.lastSegment.tick + 1;
-
         // Create and reset cursor
         var cursor = curScore.newCursor();
         cursor.voice = 0
         cursor.staffIdx = 0;       
         cursor.rewind(0);
 
+        // Total number of extra characters' width added by barlines etc.
         var offset = 0;
 
+        // Represents the next upcoming barline boundary
+        var barIdxTotal = 0;
+
+        // Current bar number
+        var barNum = 0;
+        
+        // Add string legend
+        legendTabBuf(tabBuf, 0)
+        offset += 1;
+
         while (cursor.segment) { 
-            // 
+            // Each quarter note consists of 480 ticks
+            // This corresponds to a width of 12 characters in the generated ASCII tab
             var curIdx = cursor.segment.tick/40;
             var nextIdx = cursor.segment.next.tick/40; 
-            var timeSig = cursor.measure.timesigNominal.ticks/40;  
+            var barWidth = cursor.measure.timesigNominal.ticks/40;  
 
-            console.log("*******************");
-            console.log("Indices " + curIdx*40 + " - " + nextIdx*40);
-
+            console.log("*************************");
             var timeSig = cursor.measure.timesigNominal;
-            console.log("Time signature: " + timeSig.numerator + "/" + timeSig.denominator);
-            console.log("(" + timeSig.ticks/40 + " indices per bar)");
-   
-            console.log("Measure " + cursor.measure);
+            console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
+            console.log("Indices " + curIdx + " - " + nextIdx);
+
+            // Check if a new bar has been reached
+            if (curIdx >= barIdxTotal) {
+                barIdxTotal += barWidth;
+                console.log("New bar! (#" + barNum++ + ")");
+
+                // Add new barline and padding
+                barlineTabBuf(tabBuf, offset + curIdx);
+                extendTabBuf(tabBuf, offset + curIdx + 1, offset + curIdx + 4);
+                offset += 4;
+            }
 
             if (cursor.element && cursor.element.type == Element.CHORD) {             
                 // Get chord
@@ -127,15 +140,13 @@ MuseScore {
                     stringBuf[stringNum] = fretNum;
                 }
 
-                // Extend tab buffer
-                extendTabBuf(tabBuf, curIdx, nextIdx);
+                extendTabBuf(tabBuf, offset + curIdx, offset + nextIdx);
 
                 // Write notes for current segment
-                addNotesToTabBuf(tabBuf, stringBuf, curIdx);        
+                addNotesToTabBuf(tabBuf, stringBuf, offset + curIdx);        
             }
             else if (cursor.element && cursor.element.type == Element.REST) {
-                // Extend tab buffer
-                extendTabBuf(tabBuf, curIdx, nextIdx);       
+                extendTabBuf(tabBuf, offset + curIdx, offset + nextIdx);       
             } 
             
             cursor.next();    
