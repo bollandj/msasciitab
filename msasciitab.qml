@@ -12,7 +12,7 @@ import FileIO 3.0
 MuseScore {
     menuPath: "Plugins.ASCII Tab Exporter.Export ASCII tab"
     description: "Generates an ASCII tab"
-    version: "0.0.1"
+    version: "0.1"
     requiresScore: true
 
     // Total number of extra characters' width added by barlines etc.
