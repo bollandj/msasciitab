@@ -4,7 +4,6 @@ This is a Musescore 3 plugin which generates an ASCII tablature file from a tab-
 
 ### Priority upcoming features:
 
-- Proper handling of ~~tuplets~~ and tied notes
 - Proper handling of multiple staves
 - Handling of ornaments/embellishments such as slides, hammer ons, pull offs and grace notes
 - Indication of rhythm/timing on the generated tab
