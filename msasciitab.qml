@@ -156,12 +156,16 @@ MuseScore {
                 // Get chord
                 var curChord = cursor.element;
                 
-                // Fill out string buffer for current segment (-1 = no note)
-                var stringBuf = [-1, -1, -1, -1, -1, -1];
+                // Fill out string buffer for current segment 
+                // -128 = no note
+                var stringBuf = [-128, -128, -128, -128, -128, -128];
                 for (var i=0; i<curChord.notes.length; i++) {
                     var stringNum = curChord.notes[i].string;
                     var fretNum = curChord.notes[i].fret;
-                    stringBuf[stringNum] = fretNum;
+                    if (curChord.notes[i].ghost)
+                        stringBuf[stringNum] = -1;    
+                    else
+                        stringBuf[stringNum] = fretNum;
                 }
 
                 extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
@@ -192,6 +196,9 @@ MuseScore {
             else if (stringBuf[line] >= 0) {
                 tabBuf[line][curIdx] = String(stringBuf[line]);
             }
+            else if (stringBuf[line] == -1) { // ghost note
+                tabBuf[line][curIdx] = "x";    
+            } 
         }
     }
 
