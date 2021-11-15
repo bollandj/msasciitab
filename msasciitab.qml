@@ -161,11 +161,16 @@ MuseScore {
                 var stringBuf = [-128, -128, -128, -128, -128, -128];
                 for (var i=0; i<curChord.notes.length; i++) {
                     var stringNum = curChord.notes[i].string;
-                    var fretNum = curChord.notes[i].fret;
-                    if (curChord.notes[i].ghost)
-                        stringBuf[stringNum] = -1;    
-                    else
-                        stringBuf[stringNum] = fretNum;
+                    var fretNum = curChord.notes[i].fret;  
+
+                    // check that note is first in a tied group of notes, if it is tied at all
+                    if (curChord.notes[i].firstTiedNote.position.ticks == curChord.notes[i].position.ticks)
+                    {
+                        if (curChord.notes[i].ghost) // ghost note
+                            stringBuf[stringNum] = -1;
+                        else // regular ol' note
+                            stringBuf[stringNum] = fretNum;
+                    }   
                 }
 
                 extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
