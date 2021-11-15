@@ -3,6 +3,7 @@ import QtQuick.Controls 1.1
 import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.2
 import Qt.labs.settings 1.0
+
 import Qt.labs.folderlistmodel 2.1
 import QtQml 2.2
 
@@ -35,10 +36,13 @@ MuseScore {
     FileDialog {
         id: directorySelectDialog
         title: qsTr("Export ASCII tab...")
-        selectFolder: true
+        selectFolder: false
+        nameFilters: ["ASCII tab files (*.tab)", "Text files (*.txt)"]
+        selectExisting: false
+        selectMultiple: false
         visible: false
         onAccepted: {
-            var fname = this.folder.toString().replace("file://", "").replace(/^\/(.:\/)(.*)$/, "$1$2");
+            var fname = this.fileUrl.toString().replace("file://", "").replace(/^\/(.:\/)(.*)$/, "$1$2");
             writeTab(fname);
         }
         onRejected: {
@@ -69,7 +73,8 @@ MuseScore {
         }
         else {
             console.log("Start");   
-            directorySelectDialog.folder = ((Qt.platform.os=="windows")? "file:///" : "file://") + curScore.filePath;
+            console.log("Path: " + filePath);
+            console.log("Filename: " + curScore.scoreName + ".mscz");
             directorySelectDialog.open();
         }      
     }
@@ -77,12 +82,10 @@ MuseScore {
     function writeTab(fname) {
         // Generate ASCII tab
         processTab();
-        var name = curScore.metaTag("workTitle");
-        console.log("Name: " + name);
 
         // Write to file
-        asciiTabWriter.source = fname + "/test.tab";
-        console.log("Writing to: " + asciiTabWriter.source);
+        asciiTabWriter.source = fname;
+        console.log("Writing to: " + fname);
         asciiTabWriter.write(textContent);   
 
         // Done; quit
@@ -178,8 +181,6 @@ MuseScore {
 
         // Render final part of tab to textContent
         flushTabBuf(tabBuf);
-
-        return textContent;
     }
 
     function addNotesToTabBuf(tabBuf, stringBuf, curIdx) {
@@ -230,9 +231,5 @@ MuseScore {
         // Clear tab buffer
         for (var line=0; line<6; line++)
             tabBuf[line].length = 0;
-
-        //tabBuf = [[], [], [], [], [], []];
-
-        //writeOffset = -barIdxTotal; 
     }
 }
