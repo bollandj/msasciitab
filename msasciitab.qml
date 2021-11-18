@@ -117,10 +117,11 @@ MuseScore {
             var barWidth = cursor.measure.timesigNominal.ticks/40;  
 
             // Check if a new bar has been reached
-            if (curIdx >= barIdxTotal) {               
-                console.log("New bar! (#" + barNum++ + ")");
-
+            if (curIdx >= barIdxTotal) { 
+                barNum++;  
                 barIdxTotal += barWidth;
+                            
+                console.log("New bar! (#" + barNum + ")");
 
                 if (barIdxTotal >= lineLengthLimit) {
                     if (barNum > 1) {
@@ -155,25 +156,44 @@ MuseScore {
             if (cursor.element && cursor.element.type == Element.CHORD) {             
                 // Get chord
                 var curChord = cursor.element;
+
+                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
                 
                 // Fill out string buffer for current segment 
                 // -128 = no note
                 var stringBuf = [-128, -128, -128, -128, -128, -128];
                 for (var i=0; i<curChord.notes.length; i++) {
                     var stringNum = curChord.notes[i].string;
-                    var fretNum = curChord.notes[i].fret;  
+                    var fretNum = curChord.notes[i].fret; 
+                    var symOffset = (fretNum > 9) ? 2 : 1;
 
                     // check that note is first in a tied group of notes, if it is tied at all
                     if (curChord.notes[i].firstTiedNote.position.ticks == curChord.notes[i].position.ticks)
                     {
+                        // Look for modified noteheads
                         if (curChord.notes[i].ghost) // ghost note
                             stringBuf[stringNum] = -1;
                         else // regular ol' note
                             stringBuf[stringNum] = fretNum;
+
+                        // Look for elements attached to note (bends, parentheses etc.)
+                        var noteElements =  curChord.notes[i].elements;
+                        if (noteElements.length > 0) {
+                            for (var j=0; j<noteElements.length; j++) {
+                                switch (noteElements[j].name) {
+                                    case "Bend":
+                                        tabBuf[stringNum][writeOffset + curIdx + symOffset] = "b";
+                                        break;
+                                    case "Symbol":
+                                        // Assume parenthesis for now
+                                        tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
+                                        tabBuf[stringNum][writeOffset + curIdx + symOffset] = ")";
+                                        break;
+                                }
+                            }
+                        }  
                     }   
                 }
-
-                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
 
                 // Write notes for current segment
                 addNotesToTabBuf(tabBuf, stringBuf, writeOffset + curIdx);        
@@ -190,6 +210,8 @@ MuseScore {
 
         // Render final part of tab to textContent
         flushTabBuf(tabBuf);
+
+        console.log("________________________________________");
     }
 
     function addNotesToTabBuf(tabBuf, stringBuf, curIdx) {
