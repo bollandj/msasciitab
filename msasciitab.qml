@@ -67,8 +67,6 @@ MuseScore {
     }
 
     onRun: {
-        console.log(SymId);
-
         if (typeof curScore === 'undefined') {   
             console.log("No score");      
             errorDialog.openErrorDialog("No score");
@@ -189,9 +187,9 @@ MuseScore {
 
                                     case "Symbol":
                                         console.log("symId: " + noteElements[j].symbol);
-                                        if (noteElements[j].symbol == 1877) // noteheadParenthesisLeft  
+                                        if (noteElements[j].symbol == SymId.noteheadParenthesisLeft)
                                             tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
-                                        else if (noteElements[j].symbol == 1878) // noteheadParenthesisRight 
+                                        else if (noteElements[j].symbol == SymId.noteheadParenthesisRight)
                                             tabBuf[stringNum][writeOffset + curIdx + symOffset] = ")";
                                         else
                                             console.log("Unknown symbol type!")      
@@ -212,6 +210,9 @@ MuseScore {
             else if (cursor.element && cursor.element.type == Element.REST) {
                 extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);       
             } 
+            else {
+                console.log("Other element type!");
+            }
             
             cursor.next();    
         }
