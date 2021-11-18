@@ -1,5 +1,5 @@
-import QtQuick 2.2
-import QtQuick.Controls 1.1
+import QtQuick 2.9
+import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.2
 import Qt.labs.settings 1.0
@@ -67,6 +67,8 @@ MuseScore {
     }
 
     onRun: {
+        console.log(SymId);
+
         if (typeof curScore === 'undefined') {   
             console.log("No score");      
             errorDialog.openErrorDialog("No score");
@@ -180,14 +182,23 @@ MuseScore {
                         var noteElements =  curChord.notes[i].elements;
                         if (noteElements.length > 0) {
                             for (var j=0; j<noteElements.length; j++) {
-                                switch (noteElements[j].name) {
+                                switch (noteElements[j].name) {               
                                     case "Bend":
                                         tabBuf[stringNum][writeOffset + curIdx + symOffset] = "b";
                                         break;
+
                                     case "Symbol":
-                                        // Assume parenthesis for now
-                                        tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
-                                        tabBuf[stringNum][writeOffset + curIdx + symOffset] = ")";
+                                        console.log("symId: " + noteElements[j].symbol);
+                                        if (noteElements[j].symbol == 1877) // noteheadParenthesisLeft  
+                                            tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
+                                        else if (noteElements[j].symbol == 1878) // noteheadParenthesisRight 
+                                            tabBuf[stringNum][writeOffset + curIdx + symOffset] = ")";
+                                        else
+                                            console.log("Unknown symbol type!")      
+                                        break;
+
+                                    default:
+                                        console.log("Another type of note-attached element!")       
                                         break;
                                 }
                             }
