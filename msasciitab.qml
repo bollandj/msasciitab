@@ -167,7 +167,7 @@ MuseScore {
                     var fretNum = curChord.notes[i].fret; 
                     var symOffset = (fretNum > 9) ? 2 : 1;
 
-                    // check that note is first in a tied group of notes, if it is tied at all
+                    // Check that note is first in a tied group of notes, if it is tied at all
                     if (curChord.notes[i].firstTiedNote.position.ticks == curChord.notes[i].position.ticks)
                     {
                         // Look for modified noteheads
@@ -209,9 +209,6 @@ MuseScore {
             }
             else if (cursor.element && cursor.element.type == Element.REST) {
                 extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);       
-            } 
-            else {
-                console.log("Other element type!");
             }
             
             cursor.next();    
