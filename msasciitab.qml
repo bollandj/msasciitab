@@ -112,14 +112,16 @@ MuseScore {
         while (cursor.segment) { 
             // Each quarter note consists of 480 ticks
             // This corresponds to a width of 12 characters in the generated ASCII tab
+            var curTick = cursor.segment.tick;
+            var nextTick = cursor.segment.next.tick;
             var curIdx = cursor.segment.tick/40;
             var nextIdx = cursor.segment.next.tick/40; 
-            var barWidth = cursor.measure.timesigNominal.ticks/40;  
+            var barIdxWidth = cursor.measure.timesigNominal.ticks/40;  
 
             // Check if a new bar has been reached
             if (curIdx >= barIdxTotal) { 
                 barNum++;  
-                barIdxTotal += barWidth;
+                barIdxTotal += barIdxWidth;
                             
                 console.log("New bar! (#" + barNum + ")");
 
@@ -158,6 +160,10 @@ MuseScore {
                 var curChord = cursor.element;
 
                 extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
+
+                // Get per-chord annotations
+                var chordAnnotation = getChordElementAnnotation(curTick, nextTick);
+                console.log("chordAnnotation: " + chordAnnotation);
                 
                 // Fill out string buffer for current segment 
                 // -128 = no note
@@ -186,7 +192,7 @@ MuseScore {
                                         break;
 
                                     case "Symbol":
-                                        console.log("symId: " + noteElements[j].symbol);
+                                        //console.log("Symbol SymId: " + noteElements[j].symbol);
                                         if (noteElements[j].symbol == SymId.noteheadParenthesisLeft)
                                             tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
                                         else if (noteElements[j].symbol == SymId.noteheadParenthesisRight)
@@ -221,6 +227,63 @@ MuseScore {
         flushTabBuf(tabBuf);
 
         console.log("________________________________________");
+    }
+
+    function getChordElementAnnotation(startTick, endTick) {
+        var startStaff = 0;
+        var endStaff = curScore.nstaves;
+
+        //curScore.selection.clear();
+        // This doesn't seem to be working currently
+        curScore.selection.selectRange(startTick, endTick, startStaff, endStaff);
+
+        var chordElementsList = curScore.selection.elements;
+        var annotation = "-";
+
+        console.log(chordElementsList.length + " elements in segment " + curScore.selection.startSegment.tick + " to " + curScore.selection.endSegment.tick);
+        for (var i=0; i<chordElementsList.length; i++) {
+            console.log("Element " + i);
+            switch (chordElementsList[i].name) {
+                case "Articulation":
+                    console.log("Articulation: " + chordElementsList[i].name);
+                    console.log("SymId: " + chordElementsList[i].symbol);
+                    annotation = getArticulationAnnotation(chordElementsList[i]);
+                    break;
+                case "ChordLine":
+                    console.log("ChordLine: " + chordElementsList[i].name);
+                    console.log("SymId: " + chordElementsList[i].symbol);
+                    annotation = "/"; // TODO: properly handle different ChordLine types
+                    break;
+                default:
+                    console.log("Other element type: " + chordElementsList[i].name);
+                    break;
+            }
+        } 
+
+        return annotation;      
+    }
+
+    function getArticulationAnnotation(articulationElement) {
+        switch (articulationElement.symbol) {
+            case SymId.articStaccatoAbove:
+            case SymId.articStaccatoBelow:
+            case SymId.articAccentStaccatoAbove:
+            case SymId.articAccentStaccatoBelow:
+            case SymId.articTenutoStaccatoAbove:
+            case SymId.articTenutoStaccatoBelow:
+            case SymId.articMarcatoStaccatoAbove:
+            case SymId.articMarcatoStaccatoBelow:    
+                return ".";
+            case SymId.articStaccatissimoAbove:
+            case SymId.articStaccatissimoBelow:
+            case SymId.articStaccatissimoStrokeAbove:
+            case SymId.articStaccatissimoStrokeBelow:
+            case SymId.articStaccatissimoWedgeAbove:
+            case SymId.articStaccatissimoWedgeBelow:
+                return "'";
+            default:
+                return "-";
+        }
     }
 
     function addNotesToTabBuf(tabBuf, stringBuf, curIdx) {
