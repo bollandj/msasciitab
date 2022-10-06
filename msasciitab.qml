@@ -78,7 +78,13 @@ MuseScore {
     }
 
     onRun: { 
-        if (typeof curScore === 'undefined') {  
+        console.log("Musescore version: " + mscoreMajorVersion + "." + mscoreMinorVersion + "." + mscoreUpdateVersion);
+        
+        if ((mscoreMajorVersion < 3) || (mscoreMinorVersion < 3)) {
+            console.log("Incompatible version; Musescore 3.3 and above is required to run this plugin");      
+            errorDialog.openErrorDialog("Incompatible version; Musescore 3.3 and above is required to run this plugin");
+        }
+        else if (typeof curScore === 'undefined') {  
             // requiresScore: true should handle this 
             console.log("No score");      
             errorDialog.openErrorDialog("No score");
