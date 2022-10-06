@@ -2,6 +2,8 @@
 
 This is a Musescore 3 plugin which generates an ASCII tablature file from a tab-containing score.
 
+Musescore 3.3 or later is required.
+
 Musescore plugin page can be found [here.](https://musescore.org/en/project/ascii-tab-export)
 
 ### Current features:
