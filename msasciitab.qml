@@ -16,8 +16,9 @@ MuseScore {
     version: "0.2"
     requiresScore: true
 
-    // Total number of extra characters' width added by barlines etc.
-    property var writeOffset: 0
+    // Total offset to be added to the current line's write pointer due to the additional width added
+    // by barlines, extra spacing etc.
+    property var barIdxOffset: 0
 
     // Represents the next upcoming barline boundary
     property var barIdxTotal: 0
@@ -25,11 +26,15 @@ MuseScore {
     // ASCII tab content
     property var textContent: ""
 
-    // Maximum width of a single line of tab in characters (excludes legends/barlines)
+    // Maximum width, in characters, of a single line of tablature (excluding legends and barlines)
     property var maxLineWidth: 112
+
+    // Total width, in characters, to be assigned to each quarter note/crotchet beat
+    property var quarterNoteWidth: 12
 
     FileIO {
         id: asciiTabWriter
+        source: filePath
         onError: console.log(msg + "\nFilename = " + asciiTabWriter.source);
     }
 
@@ -41,12 +46,18 @@ MuseScore {
         selectExisting: false
         selectMultiple: false
         visible: false
-        onAccepted: {
-            var fname = this.fileUrl.toString().replace("file://", "").replace(/^\/(.:\/)(.*)$/, "$1$2");
-            writeTab(fname);
+        onAccepted: {        
+            var fileName = this.fileUrl.toString().replace("file://", "").replace(/^\/(.:\/)(.*)$/, "$1$2");
+            
+            console.log("fileUrl: " + this.fileUrl);
+            console.log("fileName: " + fileName);
+
+            // Generate ASCII, then write to file
+            processTab();
+            writeTab(fileName);
         }
         onRejected: {
-            console.log("Cancelled");
+            console.log("Cancelled; quitting");
             Qt.quit();
         }
         Component.onCompleted: visible = false
@@ -66,26 +77,24 @@ MuseScore {
         }
     }
 
-    onRun: {
-        if (typeof curScore === 'undefined') {   
+    onRun: { 
+        if (typeof curScore === 'undefined') {  
+            // requiresScore: true should handle this 
             console.log("No score");      
             errorDialog.openErrorDialog("No score");
         }
         else {
-            console.log("Start");   
-            console.log("Path: " + filePath);
-            console.log("Filename: " + curScore.scoreName + ".mscz");
+            console.log("filePath: " + filePath);
+            console.log("curScore.scoreName: " + curScore.scoreName);      
             directorySelectDialog.open();
         }      
     }
 
-    function writeTab(fname) {
-        // Generate ASCII tab
-        processTab();
+    function writeTab(fileName) {
 
         // Write to file
-        asciiTabWriter.source = fname;
-        console.log("Writing to: " + fname);
+        asciiTabWriter.source = fileName;
+        console.log("Writing to: " + fileName);
         asciiTabWriter.write(textContent);   
 
         // Done; quit
@@ -94,7 +103,8 @@ MuseScore {
     }
     
     function processTab() {
-        // Initialise tab line buffer and text output
+
+        // Initialise tab line buffer
         var tabBuf = [[], [], [], [], [], []]; 
 
         // Create and reset cursor
@@ -103,23 +113,27 @@ MuseScore {
         cursor.staffIdx = 0;       
         cursor.rewind(0);
 
-        // Current bar number
-        var barNum = 0;
-
-        // Score index where line should be wrapped next 
-        var lineLengthLimit = 0;
+        var barNum = 0;          // Current bar number
+        var lineLengthLimit = 0; // Score index where line should be wrapped next 
        
         while (cursor.segment) { 
-            // Each quarter note consists of 480 ticks
-            // This corresponds to a width of 12 characters in the generated ASCII tab
+            
             var curTick = cursor.segment.tick;
             var nextTick = cursor.segment.next.tick;
-            var curIdx = cursor.segment.tick/40;
-            var nextIdx = cursor.segment.next.tick/40; 
-            var barIdxWidth = cursor.measure.timesigNominal.ticks/40;  
+
+            // Each quarter note consists of 480 ticks
+            var curCharIdx = (cursor.segment.tick * quarterNoteWidth) / 480;
+            var nextCharIdx = (cursor.segment.next.tick * quarterNoteWidth) / 480; 
+
+            var barIdxWidth = (cursor.measure.timesigNominal.ticks * quarterNoteWidth) / 480; 
+
+            console.log(" ");
+            console.log("Bar: " + barNum); 
+            console.log("Current/next tick: " + curTick + "/" + nextTick); 
+            console.log("Current/next character index: " + curCharIdx + "/" + nextCharIdx); 
 
             // Check if a new bar has been reached
-            if (curIdx >= barIdxTotal) { 
+            if (curCharIdx >= barIdxTotal) { 
                 barNum++;  
                 barIdxTotal += barIdxWidth;
                             
@@ -128,7 +142,7 @@ MuseScore {
                 if (barIdxTotal >= lineLengthLimit) {
                     if (barNum > 1) {
                         // Add final barline before break
-                        barlineTabBuf(tabBuf, writeOffset + barIdxTotal);
+                        barlineTabBuf(tabBuf, barIdxOffset + barIdxTotal);
 
                         // Flush tab buffer
                         flushTabBuf(tabBuf);
@@ -141,101 +155,104 @@ MuseScore {
                 }
 
                 // Add new barline and extra padding
-                barlineTabBuf(tabBuf, writeOffset + curIdx);
-                extendTabBuf(tabBuf, writeOffset + curIdx + 1, writeOffset + curIdx + 4);
-                writeOffset += 4;      
+                barlineTabBuf(tabBuf, barIdxOffset + curCharIdx);
+                extendTabBuf(tabBuf, barIdxOffset + curCharIdx + 1, barIdxOffset + curCharIdx + 4);
+                barIdxOffset += 4;      
             }
 
             // Debug stuff
-            console.log("________________________________________");
-            console.log("Bar " + barNum);
+            //console.log("________________________________________");
+            //console.log("Bar " + barNum);
             var timeSig = cursor.measure.timesigNominal;
-            console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
-            console.log("Indices " + curIdx + " - " + nextIdx);
-            console.log("barIdxTotal: " + barIdxTotal + ", lineLengthLimit: " + lineLengthLimit);
+            //console.log("Current time signature: " + timeSig.numerator + "/" + timeSig.denominator);
+            //console.log("Indices " + curCharIdx + " - " + nextCharIdx);
+            //console.log("barIdxTotal: " + barIdxTotal + ", lineLengthLimit: " + lineLengthLimit);
 
             // Write notes/rests
             if (cursor.element && cursor.element.type == Element.CHORD) {             
                 // Get chord
                 var curChord = cursor.element;
 
-                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);
+                extendTabBuf(tabBuf, barIdxOffset + curCharIdx, barIdxOffset + nextCharIdx);
 
                 // Get per-chord annotations
-                var chordAnnotation = getChordElementAnnotation(curTick, nextTick);
-                console.log("chordAnnotation: " + chordAnnotation);
+                //var chordAnnotation = getChordElementAnnotation(curTick, nextTick);
+                //console.log("chordAnnotation: " + chordAnnotation);
                 
                 // Fill out string buffer for current segment 
                 // -128 = no note
+                // -1 = ghost note
                 var stringBuf = [-128, -128, -128, -128, -128, -128];
-                for (var i=0; i<curChord.notes.length; i++) {
+
+                for (var i=0; i<curChord.notes.length; i++) {                   
+                    // Check that note is first in a tied group of notes, if it is tied at all;
+                    // if the note is tied from a previous note, we don't need to write it again
+                    if (curChord.notes[i].firstTiedNote.position.ticks != curChord.notes[i].position.ticks)
+                        continue;
+
                     var stringNum = curChord.notes[i].string;
                     var fretNum = curChord.notes[i].fret; 
                     var symOffset = (fretNum > 9) ? 2 : 1;
 
-                    // Check that note is first in a tied group of notes, if it is tied at all
-                    if (curChord.notes[i].firstTiedNote.position.ticks == curChord.notes[i].position.ticks)
-                    {
-                        // Look for modified noteheads
-                        if (curChord.notes[i].ghost) // ghost note
-                            stringBuf[stringNum] = -1;
-                        else // regular ol' note
-                            stringBuf[stringNum] = fretNum;
+                    // Look for modified noteheads
+                    if (curChord.notes[i].ghost) // ghost note
+                        stringBuf[stringNum] = -1;
+                    else // regular ol' note
+                        stringBuf[stringNum] = fretNum;
 
-                        // Look for elements attached to note (bends, parentheses etc.)
-                        var noteElements =  curChord.notes[i].elements;
-                        if (noteElements.length > 0) {
-                            for (var j=0; j<noteElements.length; j++) {
-                                switch (noteElements[j].name) {               
-                                    case "Bend":
-                                        tabBuf[stringNum][writeOffset + curIdx + symOffset] = "b";
-                                        break;
+                    // Look for elements attached to note (bends, parentheses etc.)
+                    var noteElements = curChord.notes[i].elements;
+                    if (noteElements.length > 0) {
+                        for (var j=0; j<noteElements.length; j++) {
+                            switch (noteElements[j].name) {               
+                                case "Bend":
+                                    tabBuf[stringNum][barIdxOffset + curCharIdx + symOffset] = "b";
+                                    break;
 
-                                    case "Symbol":
-                                        //console.log("Symbol SymId: " + noteElements[j].symbol);
-                                        if (noteElements[j].symbol == SymId.noteheadParenthesisLeft)
-                                            tabBuf[stringNum][writeOffset + curIdx - 1] = "(";
-                                        else if (noteElements[j].symbol == SymId.noteheadParenthesisRight)
-                                            tabBuf[stringNum][writeOffset + curIdx + symOffset] = ")";
-                                        else
-                                            console.log("Unknown symbol type!")      
-                                        break;
+                                case "Symbol":
+                                    //console.log("Symbol SymId: " + noteElements[j].symbol);
+                                    if (noteElements[j].symbol == SymId.noteheadParenthesisLeft)
+                                        tabBuf[stringNum][barIdxOffset + curCharIdx - 1] = "(";
+                                    else if (noteElements[j].symbol == SymId.noteheadParenthesisRight)
+                                        tabBuf[stringNum][barIdxOffset + curCharIdx + symOffset] = ")";
+                                    else
+                                        console.log("Unknown symbol type!")      
+                                    break;
 
-                                    default:
-                                        console.log("Another type of note-attached element!")       
-                                        break;
-                                }
+                                default:
+                                    console.log("Another type of note-attached element!")       
+                                    break;
                             }
-                        }  
-                    }   
+                        }
+                    }                    
                 }
 
                 // Write notes for current segment
-                addNotesToTabBuf(tabBuf, stringBuf, writeOffset + curIdx);        
+                addNotesToTabBuf(tabBuf, stringBuf, barIdxOffset + curCharIdx);        
             }
             else if (cursor.element && cursor.element.type == Element.REST) {
-                extendTabBuf(tabBuf, writeOffset + curIdx, writeOffset + nextIdx);       
+                extendTabBuf(tabBuf, barIdxOffset + curCharIdx, barIdxOffset + nextCharIdx);       
             }
             
             cursor.next();    
         }
 
         // Final barline
-        barlineTabBuf(tabBuf, writeOffset + barIdxTotal);
+        barlineTabBuf(tabBuf, barIdxOffset + barIdxTotal);
 
         // Render final part of tab to textContent
         flushTabBuf(tabBuf);
-
-        console.log("________________________________________");
     }
 
     function getChordElementAnnotation(startTick, endTick) {
+
         var startStaff = 0;
         var endStaff = curScore.nstaves;
 
         //curScore.selection.clear();
         // This doesn't seem to be working currently
-        curScore.selection.selectRange(startTick, endTick, startStaff, endStaff);
+        var ret = curScore.selection.selectRange(startTick, endTick, startStaff, endStaff);
+        console.log("selectRange: " + ret);
 
         var chordElementsList = curScore.selection.elements;
         var annotation = "-";
@@ -264,6 +281,7 @@ MuseScore {
     }
 
     function getArticulationAnnotation(articulationElement) {
+
         switch (articulationElement.symbol) {
             case SymId.articStaccatoAbove:
             case SymId.articStaccatoBelow:
@@ -286,35 +304,49 @@ MuseScore {
         }
     }
 
-    function addNotesToTabBuf(tabBuf, stringBuf, curIdx) {
-        for (var line=0; line<6; line++) { 
+    // Write note numbers/note heads into tabBuf at charIdx
+    function addNotesToTabBuf(tabBuf, stringBuf, charIdx) {
+
+        var tabBufNumStrings = tabBuf.length;
+
+        for (var line=0; line<tabBufNumStrings; line++) { 
             if (stringBuf[line] > 9) {
-                tabBuf[line][curIdx] = String(Math.floor(stringBuf[line] / 10));
-                tabBuf[line][curIdx+1] = String(stringBuf[line] % 10);     
+                tabBuf[line][charIdx] = String(Math.floor(stringBuf[line] / 10));
+                tabBuf[line][charIdx+1] = String(stringBuf[line] % 10);     
             } 
             else if (stringBuf[line] >= 0) {
-                tabBuf[line][curIdx] = String(stringBuf[line]);
+                tabBuf[line][charIdx] = String(stringBuf[line]);
             }
             else if (stringBuf[line] == -1) { // ghost note
-                tabBuf[line][curIdx] = "x";    
+                tabBuf[line][charIdx] = "x";    
             } 
         }
     }
 
-    function extendTabBuf(tabBuf, startIdx, endIdx) {
-        for (var line=0; line<6; line++)
-            for (var idx=startIdx; idx<endIdx; idx++)
+    // Write more empty space into tabBuf
+    function extendTabBuf(tabBuf, startCharIdx, endCharIdx) {
+
+        var tabBufNumStrings = tabBuf.length;
+
+        for (var line=0; line<tabBufNumStrings; line++)
+            for (var idx=startCharIdx; idx<endCharIdx; idx++)
                 tabBuf[line][idx] = "-";
     }
 
+    // Write a new (single) barline into tabBuf
     function barlineTabBuf(tabBuf, idx) {
-        for (var line=0; line<6; line++)
+
+        var tabBufNumStrings = tabBuf.length;
+
+        for (var line=0; line<tabBufNumStrings; line++)
             tabBuf[line][idx] = "|";
         
-        writeOffset++;
+        barIdxOffset++;
     }
 
+    // Write the string legend which appears at the start of each line of tablature into tabBuf
     function legendTabBuf(tabBuf, idx) {
+
         tabBuf[0][idx] = "e";
         tabBuf[1][idx] = "B";
         tabBuf[2][idx] = "G";
@@ -322,20 +354,23 @@ MuseScore {
         tabBuf[4][idx] = "A";
         tabBuf[5][idx] = "E";
 
-        writeOffset++;
+        barIdxOffset++;
     }
 
+    // Clear tabBuf, writing its contents to the text output
     function flushTabBuf(tabBuf) {
-        var tabBufLen = tabBuf[0].length;
 
-        for (var line=0; line<6; line++) { 
+        var tabBufLen = tabBuf[0].length;
+        var tabBufNumStrings = tabBuf.length;
+
+        for (var line=0; line<tabBufNumStrings; line++) { 
             textContent += tabBuf[line].join("");
             textContent += "\r\n";             
         }  
         textContent += "\r\n"; 
 
         // Clear tab buffer
-        for (var line=0; line<6; line++)
+        for (var line=0; line<tabBufNumStrings; line++)
             tabBuf[line].length = 0;
     }
 }
